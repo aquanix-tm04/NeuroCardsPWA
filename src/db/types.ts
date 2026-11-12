@@ -2,13 +2,19 @@ export type Deck = {
   id: string;
   name: string;
   created_at: number;
+  updated_at?: number;
 };
+
+export type CardType = 'standard' | 'blank';
 
 export interface Card {
   id: string;
   deck_id: string;
   question: string;
   answer: string;
+  card_type?: CardType;
+  blank_answer?: string | null;
+  flagged?: boolean;
   created_at: number;
   updated_at: number;
 }
@@ -22,6 +28,7 @@ export interface Review {
   id: string;
   card_id: string;
   rating: number; // 1=again,2=hard,3=good,4=easy
+  confidence?: number | null; // 1-5, self-rated before flip
   reviewed_at: number;
   next_due: number;
 }
@@ -50,3 +57,11 @@ export type DeckWithCounts = Deck & {
   card_count: number;
   due_count: number;
 };
+
+export interface CardImage {
+  id: string;
+  card_id: string;
+  storage_path: string;
+  display_order: number;
+  created_at: number;
+}

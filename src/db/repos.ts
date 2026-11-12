@@ -57,7 +57,8 @@ export function getAllDecks(): DeckWithCounts[] {
 
 export function createDeck(name: string): string {
   const id = uid('deck_');
-  run('INSERT INTO decks (id, name, created_at) VALUES (?, ?, ?)', [id, name.trim(), now()]);
+  const ts = now();
+  run('INSERT INTO decks (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)', [id, name.trim(), ts, ts]);
   return id;
 }
 
@@ -69,7 +70,7 @@ export function getDeck(id: string) {
 }
 
 export function renameDeck(id: string, name: string): void {
-  run('UPDATE decks SET name = ? WHERE id = ?', [name.trim(), id]);
+  run('UPDATE decks SET name = ?, updated_at = ? WHERE id = ?', [name.trim(), now(), id]);
 }
 
 export function deleteDeck(id: string): void {
@@ -77,29 +78,39 @@ export function deleteDeck(id: string): void {
 }
 
 export function getCardsInDeck(deckId: string) {
-  return queryAll<{ id: string; question: string; answer: string; created_at: number; updated_at: number }>(
-    'SELECT id, question, answer, created_at, updated_at FROM cards WHERE deck_id = ? ORDER BY created_at ASC',
+  return queryAll<{ id: string; question: string; answer: string; card_type: string; blank_answer: string | null; flagged: number; created_at: number; updated_at: number }>(
+    'SELECT id, question, answer, card_type, blank_answer, flagged, created_at, updated_at FROM cards WHERE deck_id = ? ORDER BY created_at ASC',
     [deckId]
   );
 }
 
-export function addCard(deckId: string, question: string, answer: string): string {
+export function addCard(deckId: string, question: string, answer: string, cardType: string = 'standard', blankAnswer: string | null = null): string {
   const id = uid('card_');
   const ts = now();
   run(
-    'INSERT INTO cards (id, deck_id, question, answer, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, deckId, question, answer, ts, ts]
+    'INSERT INTO cards (id, deck_id, question, answer, card_type, blank_answer, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, deckId, question, answer, cardType, blankAnswer, ts, ts]
   );
   return id;
 }
 
-export function updateCard(id: string, question: string, answer: string): void {
-  run('UPDATE cards SET question = ?, answer = ?, updated_at = ? WHERE id = ?', [
-    question,
-    answer,
-    now(),
-    id,
-  ]);
+export function updateCard(id: string, question: string, answer: string, cardType?: string, blankAnswer?: string | null): void {
+  const fields: string[] = ['question = ?', 'answer = ?', 'updated_at = ?'];
+  const params: unknown[] = [question, answer, now()];
+  if (cardType !== undefined) {
+    fields.push('card_type = ?');
+    params.push(cardType);
+  }
+  if (blankAnswer !== undefined) {
+    fields.push('blank_answer = ?');
+    params.push(blankAnswer);
+  }
+  params.push(id);
+  run(`UPDATE cards SET ${fields.join(', ')} WHERE id = ?`, params);
+}
+
+export function toggleFlagCard(id: string, flagged: boolean): void {
+  run('UPDATE cards SET flagged = ?, updated_at = ? WHERE id = ?', [flagged ? 1 : 0, now(), id]);
 }
 
 export function deleteCard(id: string): void {

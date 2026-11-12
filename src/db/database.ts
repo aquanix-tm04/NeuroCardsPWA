@@ -12,7 +12,9 @@ const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS decks (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL DEFAULT 0,
+  synced INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS cards (
@@ -20,8 +22,12 @@ CREATE TABLE IF NOT EXISTS cards (
   deck_id TEXT NOT NULL,
   question TEXT NOT NULL,
   answer TEXT NOT NULL,
+  card_type TEXT NOT NULL DEFAULT 'standard',
+  blank_answer TEXT,
+  flagged INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
+  synced INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
 );
 
@@ -42,8 +48,10 @@ CREATE TABLE IF NOT EXISTS reviews (
   id TEXT PRIMARY KEY,
   card_id TEXT NOT NULL,
   rating INTEGER NOT NULL,
+  confidence INTEGER,
   reviewed_at INTEGER NOT NULL,
   next_due INTEGER NOT NULL,
+  synced INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
 );
 
@@ -52,11 +60,33 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS card_images (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  synced INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_cards_deck ON cards(deck_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_card ON reviews(card_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_due ON reviews(next_due);
 CREATE INDEX IF NOT EXISTS idx_card_tags_card ON card_tags(card_id);
 CREATE INDEX IF NOT EXISTS idx_card_tags_tag ON card_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_card_images_card ON card_images(card_id);
+`;
+
+const MIGRATION_SQL = `
+ALTER TABLE decks ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE decks ADD COLUMN synced INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE cards ADD COLUMN card_type TEXT NOT NULL DEFAULT 'standard';
+ALTER TABLE cards ADD COLUMN blank_answer TEXT;
+ALTER TABLE cards ADD COLUMN flagged INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE cards ADD COLUMN synced INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE reviews ADD COLUMN confidence INTEGER;
+ALTER TABLE reviews ADD COLUMN synced INTEGER NOT NULL DEFAULT 0;
 `;
 
 function idbOpen(): Promise<IDBDatabase> {
@@ -109,6 +139,11 @@ export async function initDb(): Promise<Database> {
   const saved = await loadFromIdb();
   db = saved ? new SQL.Database(saved) : new SQL.Database();
   db.run(SCHEMA_SQL);
+  try {
+    db.run(MIGRATION_SQL);
+  } catch {
+    // Columns already exist
+  }
   await persist();
   return db;
 }

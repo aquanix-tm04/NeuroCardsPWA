@@ -72,19 +72,20 @@ export function getCardState(cardId: string): Sm2State | null {
   return state;
 }
 
-export function recordReview(cardId: string, rating: Rating): Review {
+export function recordReview(cardId: string, rating: Rating, confidence?: number): Review {
   const state = getCardState(cardId);
   const next = sm2(state, rating);
   const review: Review = {
     id: uid('rev_'),
     card_id: cardId,
     rating,
+    confidence: confidence ?? null,
     reviewed_at: Date.now(),
     next_due: next.next_due,
   };
   run(
-    'INSERT INTO reviews (id, card_id, rating, reviewed_at, next_due) VALUES (?, ?, ?, ?, ?)',
-    [review.id, review.card_id, review.rating, review.reviewed_at, review.next_due]
+    'INSERT INTO reviews (id, card_id, rating, confidence, reviewed_at, next_due) VALUES (?, ?, ?, ?, ?, ?)',
+    [review.id, review.card_id, review.rating, review.confidence, review.reviewed_at, review.next_due]
   );
   return review;
 }
@@ -97,9 +98,21 @@ export function undoLastReview(cardId: string): void {
   if (last) run('DELETE FROM reviews WHERE id = ?', [last.id]);
 }
 
-export function getDueCards(deckId?: string, limit?: number): Array<{ id: string; question: string; answer: string; deck_id: string; deck_name: string }> {
+export function previewIntervals(cardId: string): Record<Rating, { label: string; days: number }> {
+  const state = getCardState(cardId);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const results = {} as Record<Rating, { label: string; days: number }>;
+  for (const r of [1, 2, 3, 4] as Rating[]) {
+    const next = sm2(state, r);
+    const days = Math.round((next.next_due - Date.now()) / dayMs);
+    results[r] = { label: days <= 0 ? '<1d' : `${days}d`, days };
+  }
+  return results;
+}
+
+export function getDueCards(deckId?: string, limit?: number): Array<{ id: string; question: string; answer: string; deck_id: string; deck_name: string; card_type: string; blank_answer: string | null; flagged: number }> {
   const now = Date.now();
-  let sql = `SELECT c.id, c.question, c.answer, c.deck_id, d.name AS deck_name
+  let sql = `SELECT c.id, c.question, c.answer, c.deck_id, d.name AS deck_name, c.card_type, c.blank_answer, c.flagged
      FROM cards c
      JOIN decks d ON d.id = c.deck_id
      LEFT JOIN (
