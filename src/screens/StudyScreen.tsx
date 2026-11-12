@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Undo2, RotateCw, X, CheckCircle2, Brain } from 'lucide-react';
+import { Undo2, RotateCw, X, CheckCircle2, Brain, Flag } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useNav } from '@/context/NavContext';
 import { TopBar } from '@/components/TopBar';
 import { EmptyState } from '@/components/EmptyState';
 import { LatexContent } from '@/components/LatexContent';
-import { getDueCards, recordReview, undoLastReview } from '@/db/sm2';
+import { CardImages } from '@/components/CardImages';
+import { getDueCards, recordReview, undoLastReview, previewIntervals } from '@/db/sm2';
+import { toggleFlagCard } from '@/db/repos';
+import { getLocalCardImages } from '@/lib/images';
 import { toPersianDigits } from '@/lib/normalize';
 import type { Rating } from '@/db/types';
 
@@ -19,6 +22,9 @@ interface StudyCard {
   answer: string;
   deck_id: string;
   deck_name: string;
+  card_type: string;
+  blank_answer: string | null;
+  flagged: number;
 }
 
 export function StudyScreen({ deckId }: Props) {
@@ -36,6 +42,9 @@ export function StudyScreen({ deckId }: Props) {
   const [lastCardId, setLastCardId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [done, setDone] = useState(false);
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [showConfidence, setShowConfidence] = useState(false);
+  const [cardImages, setCardImages] = useState<Array<{ id: string; url: string | null }>>([]);
   const startRef = useRef<number>(Date.now());
 
   useEffect(() => {
@@ -53,11 +62,26 @@ export function StudyScreen({ deckId }: Props) {
 
   const current = cards[index];
 
+  useEffect(() => {
+    if (current) {
+      setCardImages(getLocalCardImages(current.id));
+    } else {
+      setCardImages([]);
+    }
+  }, [current?.id]);
+
+  const intervals = useMemo(() => {
+    if (!current) return null;
+    return previewIntervals(current.id);
+  }, [current?.id, studied]);
+
   const grade = useCallback((rating: Rating) => {
     if (!current) return;
-    recordReview(current.id, rating);
+    recordReview(current.id, rating, confidence ?? undefined);
     setLastCardId(current.id);
     setStudied((s) => s + 1);
+    setConfidence(null);
+    setShowConfidence(false);
 
     if (index + 1 >= cards.length) {
       setDone(true);
@@ -65,7 +89,7 @@ export function StudyScreen({ deckId }: Props) {
       setIndex((i) => i + 1);
       setFlipped(false);
     }
-  }, [current, index, cards.length]);
+  }, [current, index, cards.length, confidence]);
 
   const undo = useCallback(() => {
     if (!lastCardId) return;
@@ -75,11 +99,24 @@ export function StudyScreen({ deckId }: Props) {
     setFlipped(false);
     setDone(false);
     setLastCardId(null);
+    setConfidence(null);
+    setShowConfidence(false);
   }, [lastCardId]);
 
-  const flip = useCallback(() => setFlipped((f) => !f), []);
+  const flip = useCallback(() => {
+    if (!flipped) {
+      setShowConfidence(true);
+    }
+    setFlipped((f) => !f);
+  }, [flipped]);
 
-  // Keyboard shortcuts
+  const handleFlag = useCallback(() => {
+    if (!current) return;
+    const newFlag = current.flagged !== 1;
+    toggleFlagCard(current.id, newFlag);
+    setCards((cs) => cs.map((c) => c.id === current.id ? { ...c, flagged: newFlag ? 1 : 0 } : c));
+  }, [current]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (done) return;
@@ -107,18 +144,13 @@ export function StudyScreen({ deckId }: Props) {
     return Math.round((index / cards.length) * 100);
   }, [index, cards.length]);
 
-  // Determine which side is question based on direction
   const showQuestionFront = direction === 'forward' || direction === 'both';
 
   if (cards.length === 0 && !done) {
     return (
       <div className="pb-24">
         <TopBar title={t('study')} showBack />
-        <EmptyState
-          icon={<Brain size={28} />}
-          title={t('noDue')}
-          message={t('finished')}
-        />
+        <EmptyState icon={<Brain size={28} />} title={t('noDue')} message={t('finished')} />
       </div>
     );
   }
@@ -160,6 +192,8 @@ export function StudyScreen({ deckId }: Props) {
     { rating: 4, label: t('easy'), color: 'bg-sky-500 hover:bg-sky-600' },
   ];
 
+  const isTablet = typeof window !== 'undefined' && window.innerWidth >= 768;
+
   return (
     <div className="flex min-h-[100dvh] flex-col pb-24">
       <TopBar title={t('study')} showBack />
@@ -170,12 +204,20 @@ export function StudyScreen({ deckId }: Props) {
           <span className="text-sm font-medium text-ink-500 dark:text-ink-400">
             {idxDisplay} / {totalDisplay}
           </span>
-          {showTimer && (
-            <span className="flex items-center gap-1 text-sm tabular-nums text-ink-400 dark:text-ink-500">
-              <RotateCw size={14} />
-              {fmtTime(elapsed)}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {current.flagged === 1 && (
+              <span className="flex items-center gap-1 text-xs text-accent-500">
+                <Flag size={14} />
+                {t('flagged')}
+              </span>
+            )}
+            {showTimer && (
+              <span className="flex items-center gap-1 text-sm tabular-nums text-ink-400 dark:text-ink-500">
+                <RotateCw size={14} />
+                {fmtTime(elapsed)}
+              </span>
+            )}
+          </div>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-700">
           <div
@@ -197,7 +239,7 @@ export function StudyScreen({ deckId }: Props) {
         >
           <div className={`flip-card relative h-full min-h-[320px] ${flipped ? 'flipped' : ''}`}>
             {/* Front */}
-            <div className="flip-face card-surface absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <div className="flip-face card-surface absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto p-6 text-center">
               <span className="rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-400 dark:bg-ink-700 dark:text-ink-300">
                 {frontLabel}
               </span>
@@ -205,10 +247,11 @@ export function StudyScreen({ deckId }: Props) {
                 text={frontText}
                 className="text-xl font-medium leading-relaxed text-ink-900 dark:text-white"
               />
+              <CardImages images={cardImages} />
               <p className="absolute bottom-4 text-xs text-ink-300 dark:text-ink-500">{t('tapToFlip')}</p>
             </div>
             {/* Back */}
-            <div className="flip-face flip-back card-surface absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <div className="flip-face flip-back card-surface absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto p-6 text-center">
               <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600 dark:bg-brand-900/30 dark:text-brand-400">
                 {backLabel}
               </span>
@@ -216,27 +259,62 @@ export function StudyScreen({ deckId }: Props) {
                 text={backText}
                 className="text-lg leading-relaxed text-ink-800 dark:text-ink-100"
               />
+              <CardImages images={cardImages} />
             </div>
           </div>
         </div>
 
-        {/* Grading buttons */}
-        <div className="mt-6">
+        {/* Confidence check */}
+        {showConfidence && flipped && (
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <span className="text-xs text-ink-400 dark:text-ink-500">{t('confidence')}</span>
+            <div className="flex gap-1">
+              {[1, 2, 3].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setConfidence(c === 1 ? 1 : c === 2 ? 3 : 5)}
+                  className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
+                    confidence === (c === 1 ? 1 : c === 2 ? 3 : 5)
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-ink-100 text-ink-600 dark:bg-ink-700 dark:text-ink-200'
+                  }`}
+                >
+                  {c === 1 ? t('confidenceLow') : c === 2 ? t('confidenceMid') : t('confidenceHigh')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Grading buttons with interval previews */}
+        <div className="mt-4">
           {!flipped ? (
-            <button onClick={flip} className="primary-btn w-full">
-              <RotateCw size={18} />
-              {t('flip')}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={flip} className="primary-btn flex-1">
+                <RotateCw size={18} />
+                {t('flip')}
+              </button>
+              <button
+                onClick={handleFlag}
+                className={`ghost-btn px-3 ${current.flagged === 1 ? 'text-accent-600 dark:text-accent-400' : ''}`}
+                aria-label={t('flagCard')}
+              >
+                <Flag size={18} />
+              </button>
+            </div>
           ) : (
-            <div className="grid grid-cols-4 gap-2">
+            <div className={`grid ${isTablet ? 'grid-cols-4' : 'grid-cols-4'} gap-2`}>
               {grades.map((g, i) => (
                 <button
                   key={g.rating}
                   onClick={() => grade(g.rating)}
-                  className={`flex flex-col items-center gap-1 rounded-xl ${g.color} py-3 text-white transition active:scale-95`}
+                  className={`flex flex-col items-center gap-0.5 rounded-xl ${g.color} py-2.5 text-white transition active:scale-95`}
                 >
                   <span className="text-xs font-bold opacity-70">{lang === 'fa' ? toPersianDigits(i + 1) : i + 1}</span>
                   <span className="text-xs font-medium">{g.label}</span>
+                  {intervals && intervals[g.rating] && (
+                    <span className="text-[10px] opacity-80">{t('backIn')} {intervals[g.rating].label}</span>
+                  )}
                 </button>
               ))}
             </div>

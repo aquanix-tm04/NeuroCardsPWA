@@ -4,7 +4,6 @@ import { NavProvider, useNav, type Route } from '@/context/NavContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { TabBar } from '@/components/TabBar';
 import { Loading } from '@/components/Loading';
-import { SyncIndicator } from '@/components/SyncIndicator';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { DeckDetailScreen } from '@/screens/DeckDetailScreen';
 import { StudyScreen } from '@/screens/StudyScreen';
@@ -15,8 +14,7 @@ import { ImportScreen } from '@/screens/ImportScreen';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { TransferScreen } from '@/screens/TransferScreen';
 import { startReminderWatcher } from '@/lib/reminder';
-import { fullSync, initOnlineWatcher, onSyncStatusChange } from '@/lib/sync';
-import { supabase } from '@/lib/supabase';
+import { fullSync, initOnlineWatcher } from '@/lib/sync';
 
 const TAB_ROUTES = new Set<Route['name']>(['home', 'study', 'quiz', 'stats', 'settings']);
 
@@ -79,11 +77,6 @@ function Shell() {
       setNeedsTransfer(true);
     }
   }, [authState, user]);
-
-  useEffect(() => {
-    if (!ready || authState !== 'authenticated' || needsTransfer) return;
-    return onSyncStatusChange(() => {});
-  }, [ready, authState, needsTransfer]);
 
   if (authState === 'loading' && !offlineMode) {
     return <Loading label="NeuroCards" />;

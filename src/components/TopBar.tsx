@@ -2,6 +2,8 @@ import { type ReactNode } from 'react';
 import { ChevronLeft, Monitor, Moon, Sun, Settings as SettingsIcon } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useNav } from '@/context/NavContext';
+import { useAuth } from '@/context/AuthContext';
+import { SyncIndicator } from '@/components/SyncIndicator';
 import type { ThemeMode } from '@/lib/theme';
 
 interface Props {
@@ -13,6 +15,7 @@ interface Props {
 export function TopBar({ title, showBack, rightAction }: Props) {
   const { t, theme, updateTheme } = useApp();
   const { goBack, navigate } = useNav();
+  const { state: authState } = useAuth();
 
   const cycleTheme = () => {
     const order: ThemeMode[] = ['auto', 'light', 'dark'];
@@ -33,7 +36,6 @@ export function TopBar({ title, showBack, rightAction }: Props) {
           className="icon-btn"
           aria-label={t('backHome')}
         >
-          {/* In RTL, "back" visually points right; ChevronLeft rotated is fine */}
           <ChevronLeft size={22} className="rotate-180 rtl:rotate-0" />
         </button>
       ) : null}
@@ -41,6 +43,8 @@ export function TopBar({ title, showBack, rightAction }: Props) {
       <h1 className="flex-1 truncate text-lg font-bold text-ink-900 dark:text-white">
         {title ?? t('appName')}
       </h1>
+
+      {authState === 'authenticated' && <SyncIndicator />}
 
       {rightAction}
 

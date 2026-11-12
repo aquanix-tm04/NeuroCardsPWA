@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { ListChecks, CheckCircle2, XCircle, Shuffle, ArrowLeft } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { ListChecks, CheckCircle2, XCircle, Shuffle, ArrowLeft, ThumbsUp } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useNav } from '@/context/NavContext';
 import { TopBar } from '@/components/TopBar';
@@ -8,6 +8,7 @@ import { LatexContent } from '@/components/LatexContent';
 import { getAllDecks } from '@/db/repos';
 import { getAllCardsWithDeck } from '@/db/sm2';
 import { normalizeForMatch, stripLatex, toPersianDigits } from '@/lib/normalize';
+import { checkAnswer as autoCheck, type CheckResult } from '@/lib/answerCheck';
 
 type QuizType = 'mcq' | 'typein' | 'tf';
 
@@ -17,6 +18,9 @@ interface QuizCard {
   answer: string;
   deck_id: string;
   deck_name: string;
+  card_type: string;
+  blank_answer: string | null;
+  flagged: number;
 }
 
 interface Props {
@@ -54,6 +58,8 @@ export function QuizScreen({ deckId }: Props) {
   const [tfChoice, setTfChoice] = useState<boolean | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [pool, setPool] = useState<QuizCard[]>([]);
+  const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
+  const [overridden, setOverridden] = useState(false);
 
   // MCQ distractors are drawn from the whole deck, not just the picked questions
   const options = useMemo(() => {
@@ -100,7 +106,9 @@ export function QuizScreen({ deckId }: Props) {
       return selectedOption !== null && options[selectedOption]?.id === current.id;
     }
     if (quizType === 'typein') {
-      return normalizeForMatch(typedAnswer) === normalizeForMatch(stripLatex(current.answer));
+      const result = autoCheck(typedAnswer, current.answer);
+      setCheckResult(result);
+      return result.correct;
     }
     if (quizType === 'tf') {
       return tfChoice === tfDisplay?.isCorrect;
@@ -124,6 +132,17 @@ export function QuizScreen({ deckId }: Props) {
     setSubmitted(true);
   };
 
+  const handleOverride = () => {
+    setOverridden(true);
+    setAnswers((a) => {
+      const copy = [...a];
+      if (copy.length > 0) {
+        copy[copy.length - 1] = { ...copy[copy.length - 1], correct: true };
+      }
+      return copy;
+    });
+  };
+
   const handleNext = () => {
     if (quizIndex + 1 >= quizCards.length) {
       setPhase('done');
@@ -133,6 +152,8 @@ export function QuizScreen({ deckId }: Props) {
       setTypedAnswer('');
       setTfChoice(null);
       setSubmitted(false);
+      setCheckResult(null);
+      setOverridden(false);
     }
   };
 
@@ -307,7 +328,7 @@ export function QuizScreen({ deckId }: Props) {
   const current = quizCards[quizIndex];
   const idxDisplay = lang === 'fa' ? toPersianDigits(quizIndex + 1) : quizIndex + 1;
   const totalDisplay = lang === 'fa' ? toPersianDigits(quizCards.length) : quizCards.length;
-  const isCorrect = submitted && answers[answers.length - 1]?.correct;
+  const isCorrect = submitted && (overridden || answers[answers.length - 1]?.correct);
 
   return (
     <div className="flex min-h-[100dvh] flex-col pb-24">
@@ -377,7 +398,51 @@ export function QuizScreen({ deckId }: Props) {
                 className="field-input text-base"
                 onKeyDown={(e) => e.key === 'Enter' && !submitted && handleSubmit()}
               />
-              {submitted && (
+              {submitted && checkResult && (
+                <div className="mt-3 space-y-3">
+                  <div className={`rounded-xl p-4 ${checkResult.correct || overridden ? 'bg-brand-50 dark:bg-brand-900/20' : 'bg-red-50 dark:bg-red-950/20'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-ink-700 dark:text-ink-200">
+                        {t('answerScore')}
+                      </span>
+                      <span className={`text-lg font-bold ${checkResult.correct || overridden ? 'text-brand-600 dark:text-brand-400' : 'text-red-500'}`}>
+                        {lang === 'fa' ? toPersianDigits(checkResult.score) : checkResult.score}%
+                      </span>
+                    </div>
+                    {checkResult.missed.length > 0 && !overridden && (
+                      <div className="mt-2">
+                        <p className="text-xs text-red-500">{t('missedPoints')}:</p>
+                        <ul className="mt-1 space-y-1">
+                          {checkResult.missed.slice(0, 5).map((p, i) => (
+                            <li key={i} className="text-xs text-ink-500 dark:text-ink-400">• {p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {checkResult.matched.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-brand-600 dark:text-brand-400">{t('matchedPoints')}:</p>
+                        <ul className="mt-1 space-y-1">
+                          {checkResult.matched.slice(0, 3).map((p, i) => (
+                            <li key={i} className="text-xs text-ink-500 dark:text-ink-400">• {p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  {!checkResult.correct && !overridden && (
+                    <button onClick={handleOverride} className="ghost-btn w-full text-sm">
+                      <ThumbsUp size={16} />
+                      {t('overrideCorrect')}
+                    </button>
+                  )}
+                  <div className="card-surface p-4">
+                    <p className="text-xs text-ink-400">{t('answer')}:</p>
+                    <LatexContent text={current.answer} className="mt-1 text-sm text-brand-700 dark:text-brand-300" />
+                  </div>
+                </div>
+              )}
+              {submitted && !checkResult && (
                 <div className="mt-3 card-surface p-4">
                   <p className="text-xs text-ink-400">{t('answer')}:</p>
                   <LatexContent text={current.answer} className="mt-1 text-sm text-brand-700 dark:text-brand-300" />

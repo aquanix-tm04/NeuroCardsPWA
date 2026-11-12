@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Brain, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, CloudOff, Cloud } from 'lucide-react';
+import { Brain, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, Cloud } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 
 type Mode = 'signin' | 'signup' | 'reset';
 
-export function AuthScreen() {
+interface Props {
+  onContinueOffline: () => void;
+}
+
+export function AuthScreen({ onContinueOffline }: Props) {
   const { t } = useApp();
   const { signIn, signUp, resetPassword } = useAuth();
 
@@ -57,8 +61,8 @@ export function AuthScreen() {
         </div>
 
         {mode !== 'reset' && (
-          <div className="flex items-center gap-2 rounded-xl bg-brand-50 px-4 py-3 text-xs text-brand-700 dark:bg-brand-900/20 dark:text-brand-300">
-            <Cloud size={18} className="shrink-0" />
+          <div className="flex items-start gap-2 rounded-xl bg-brand-50 px-4 py-3 text-xs text-brand-700 dark:bg-brand-900/20 dark:text-brand-300">
+            <Cloud size={18} className="mt-0.5 shrink-0" />
             <span>{t('privacyNotice')}</span>
           </div>
         )}
@@ -126,7 +130,7 @@ export function AuthScreen() {
         <div className="space-y-2 text-center text-sm">
           {mode === 'signin' && (
             <>
-              <button onClick={() => { setMode('reset'); setError(''); setSuccess(''); }} className="text-brand-600 hover:underline dark:text-brand-400">
+              <button onClick={() => { setMode('reset'); setError(''); setSuccess(''); }} className="block w-full text-brand-600 hover:underline dark:text-brand-400">
                 {t('forgotPassword')}
               </button>
               <p className="text-ink-400 dark:text-ink-500">
@@ -151,6 +155,13 @@ export function AuthScreen() {
             </button>
           )}
         </div>
+
+        <button
+          onClick={onContinueOffline}
+          className="block w-full text-center text-xs text-ink-400 transition hover:text-ink-600 dark:text-ink-500 dark:hover:text-ink-300"
+        >
+          {t('continueOffline')}
+        </button>
       </div>
     </div>
   );
