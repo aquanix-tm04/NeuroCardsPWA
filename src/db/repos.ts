@@ -26,16 +26,17 @@ export async function ensureSeeded(): Promise<void> {
   if (existing && existing.c > 0) return;
 
   const ts = now();
-  run('INSERT INTO decks (id, name, created_at) VALUES (?, ?, ?)', [
+  run('INSERT INTO decks (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)', [
     SEED_DECK_ID,
     'علوم اعصاب',
+    ts,
     ts,
   ]);
 
   for (const c of SEED_CARDS) {
     run(
-      'INSERT INTO cards (id, deck_id, question, answer, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [uid('card_'), SEED_DECK_ID, c.question, c.answer, ts, ts]
+      'INSERT INTO cards (id, deck_id, question, answer, card_type, blank_answer, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [uid('card_'), SEED_DECK_ID, c.question, c.answer, 'standard', null, ts, ts]
     );
   }
 }
@@ -135,4 +136,50 @@ export async function resetAllData(): Promise<void> {
 export function addCardsBulk(deckId: string, rows: { question: string; answer: string }[]): number {
   for (const r of rows) addCard(deckId, r.question, r.answer);
   return rows.length;
+}
+
+export function getCardImages(cardId: string): Array<{ id: string; card_id: string; storage_path: string; display_order: number; created_at: number }> {
+  return queryAll(
+    'SELECT id, card_id, storage_path, display_order, created_at FROM card_images WHERE card_id = ? ORDER BY display_order ASC',
+    [cardId]
+  );
+}
+
+export function addCardImage(cardId: string, storagePath: string, displayOrder: number = 0): string {
+  const id = uid('img_');
+  run(
+    'INSERT INTO card_images (id, card_id, storage_path, display_order, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, cardId, storagePath, displayOrder, now()]
+  );
+  return id;
+}
+
+export function deleteCardImage(id: string): void {
+  run('DELETE FROM card_images WHERE id = ?', [id]);
+}
+
+export function getFlaggedCards(): Array<{ id: string; question: string; deck_name: string }> {
+  return queryAll(
+    `SELECT c.id, c.question, d.name AS deck_name FROM cards c
+     JOIN decks d ON d.id = c.deck_id
+     WHERE c.flagged = 1 ORDER BY c.updated_at DESC`
+  );
+}
+
+export function countAllCards(): number {
+  const r = queryOne<{ c: number }>('SELECT COUNT(*) as c FROM cards');
+  return r ? Number(r.c) : 0;
+}
+
+export function getAllLocalDataForSync() {
+  const decks = queryAll<{ id: string; name: string; created_at: number; updated_at: number; synced: number }>(
+    'SELECT id, name, created_at, updated_at, synced FROM decks'
+  );
+  const cards = queryAll<{ id: string; deck_id: string; question: string; answer: string; card_type: string; blank_answer: string | null; flagged: number; created_at: number; updated_at: number; synced: number }>(
+    'SELECT id, deck_id, question, answer, card_type, blank_answer, flagged, created_at, updated_at, synced FROM cards'
+  );
+  const reviews = queryAll<{ id: string; card_id: string; rating: number; confidence: number | null; reviewed_at: number; next_due: number; synced: number }>(
+    'SELECT id, card_id, rating, confidence, reviewed_at, next_due, synced FROM reviews'
+  );
+  return { decks, cards, reviews };
 }

@@ -50,7 +50,6 @@ export function getLeechCards(limit = 20): { id: string; question: string; deck_
 }
 
 export function getStreakDays(): number {
-  // Days with at least one review, counting back from today
   const rows = queryAll<{ d: string }>(
     `SELECT DISTINCT DATE(reviewed_at / 1000, 'unixepoch', 'localtime') as d
      FROM reviews ORDER BY d DESC`
@@ -61,6 +60,7 @@ export function getStreakDays(): number {
   today.setHours(0, 0, 0, 0);
   let streak = 0;
   let cursor = today.getTime();
+  let skipped = 0;
 
   for (const row of rows) {
     const d = new Date(row.d + 'T00:00:00').getTime();
@@ -68,8 +68,38 @@ export function getStreakDays(): number {
       streak++;
       cursor -= 24 * 60 * 60 * 1000;
     } else if (d < cursor) {
-      break;
+      const gapDays = Math.round((cursor - d) / (24 * 60 * 60 * 1000));
+      if (gapDays === 2 && skipped === 0) {
+        skipped = 1;
+        cursor = d;
+        streak++;
+        cursor -= 24 * 60 * 60 * 1000;
+      } else {
+        break;
+      }
     }
   }
   return streak;
+}
+
+export function getReviewsToday(): number {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const r = queryOne<{ c: number }>(
+    'SELECT COUNT(*) as c FROM reviews WHERE reviewed_at >= ?',
+    [todayStart.getTime()]
+  );
+  return r ? Number(r.c) : 0;
+}
+
+export function getDueTodayCount(): number {
+  const now = Date.now();
+  const r = queryOne<{ c: number }>(
+    `SELECT COUNT(*) as c FROM cards c
+     LEFT JOIN (SELECT card_id, MAX(next_due) AS next_due FROM reviews GROUP BY card_id) r
+       ON r.card_id = c.id
+     WHERE r.next_due IS NULL OR r.next_due <= ?`,
+    [now]
+  );
+  return r ? Number(r.c) : 0;
 }

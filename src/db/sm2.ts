@@ -142,9 +142,9 @@ export function countDueToday(): number {
   return r ? Number(r.c) : 0;
 }
 
-export function getAllCardsWithDeck(): Array<{ id: string; question: string; answer: string; deck_id: string; deck_name: string }> {
+export function getAllCardsWithDeck(): Array<{ id: string; question: string; answer: string; deck_id: string; deck_name: string; card_type: string; blank_answer: string | null; flagged: number }> {
   return queryAll(
-    `SELECT c.id, c.question, c.answer, c.deck_id, d.name AS deck_name
+    `SELECT c.id, c.question, c.answer, c.deck_id, d.name AS deck_name, c.card_type, c.blank_answer, c.flagged
      FROM cards c JOIN decks d ON d.id = c.deck_id
      ORDER BY d.created_at DESC, c.created_at ASC`
   );

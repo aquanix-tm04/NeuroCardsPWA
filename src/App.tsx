@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { NavProvider, useNav, type Route } from '@/context/NavContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { TabBar } from '@/components/TabBar';
 import { Loading } from '@/components/Loading';
+import { SyncIndicator } from '@/components/SyncIndicator';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { DeckDetailScreen } from '@/screens/DeckDetailScreen';
 import { StudyScreen } from '@/screens/StudyScreen';
@@ -10,7 +12,11 @@ import { QuizScreen } from '@/screens/QuizScreen';
 import { StatsScreen } from '@/screens/StatsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { ImportScreen } from '@/screens/ImportScreen';
+import { AuthScreen } from '@/screens/AuthScreen';
+import { TransferScreen } from '@/screens/TransferScreen';
 import { startReminderWatcher } from '@/lib/reminder';
+import { fullSync, initOnlineWatcher, onSyncStatusChange } from '@/lib/sync';
+import { supabase } from '@/lib/supabase';
 
 const TAB_ROUTES = new Set<Route['name']>(['home', 'study', 'quiz', 'stats', 'settings']);
 
@@ -45,14 +51,59 @@ function Screen({ route }: { route: Route }) {
   }
 }
 
+const TRANSFER_KEY = 'neurocards_transfer_done';
+
 function Shell() {
   const { ready } = useApp();
   const { route } = useNav();
+  const { state: authState, user } = useAuth();
+  const [needsTransfer, setNeedsTransfer] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
     return startReminderWatcher();
   }, [ready]);
+
+  useEffect(() => {
+    if (!ready || authState !== 'authenticated') return;
+    const cleanup = initOnlineWatcher();
+    fullSync();
+    return cleanup;
+  }, [ready, authState]);
+
+  useEffect(() => {
+    if (authState !== 'authenticated' || !user) return;
+    const done = localStorage.getItem(TRANSFER_KEY);
+    if (!done) {
+      setNeedsTransfer(true);
+    }
+  }, [authState, user]);
+
+  useEffect(() => {
+    if (!ready || authState !== 'authenticated' || needsTransfer) return;
+    return onSyncStatusChange(() => {});
+  }, [ready, authState, needsTransfer]);
+
+  if (authState === 'loading' && !offlineMode) {
+    return <Loading label="NeuroCards" />;
+  }
+
+  if (authState === 'unauthenticated' && !offlineMode) {
+    const goOffline = () => setOfflineMode(true);
+    return <AuthScreen onContinueOffline={goOffline} />;
+  }
+
+  if (needsTransfer && authState === 'authenticated') {
+    return (
+      <TransferScreen
+        onComplete={() => {
+          localStorage.setItem(TRANSFER_KEY, '1');
+          setNeedsTransfer(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] bg-ink-50 text-ink-900 dark:bg-ink-950 dark:text-ink-100">
@@ -72,11 +123,13 @@ function Shell() {
 
 function App() {
   return (
-    <AppProvider>
-      <NavProvider>
-        <Shell />
-      </NavProvider>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <NavProvider>
+          <Shell />
+        </NavProvider>
+      </AppProvider>
+    </AuthProvider>
   );
 }
 
