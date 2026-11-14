@@ -68,12 +68,12 @@ export function StudyScreen({ deckId }: Props) {
     } else {
       setCardImages([]);
     }
-  }, [current?.id]);
+  }, [current]);
 
   const intervals = useMemo(() => {
     if (!current) return null;
     return previewIntervals(current.id);
-  }, [current?.id, studied]);
+  }, [current]);
 
   const grade = useCallback((rating: Rating) => {
     if (!current) return;
