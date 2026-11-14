@@ -170,6 +170,18 @@ const DICT: Record<string, { fa: string; en: string }> = {
   blankAnswerHint: { fa: 'متن پنهان‌شده (کلمه/عبارتی که باید یاد گرفته شود)', en: 'Hidden text (word/phrase to recall)' },
   // Mixed
   mixedReview: { fa: 'مرور ترکیبی', en: 'Mixed review' },
+  // Stats — extended
+  retentionRate: { fa: 'نرخ حفظ', en: 'Retention rate' },
+  reviewTrend: { fa: 'روند مرور (۱۴ روز)', en: 'Review trend (14 days)' },
+  retentionTrend: { fa: 'روند حفظ (۱۴ روز)', en: 'Retention trend (14 days)' },
+  longestStreak: { fa: 'طولانی‌ترین پیاپی', en: 'Longest streak' },
+  cardsStudied: { fa: 'کارت مطالعه‌شده', en: 'Cards studied' },
+  perDeck: { fa: 'آمار هر دسته', en: 'Per-deck stats' },
+  reviews: { fa: 'مرور', en: 'reviews' },
+  bestDay: { fa: 'بهترین روز', en: 'Best day' },
+  avgPerDay: { fa: 'میانگین روزانه', en: 'Avg / day' },
+  last14Days: { fa: '۱۴ روز اخیر', en: 'Last 14 days' },
+  noActivityYet: { fa: 'هنوز فعالیتی ثبت نشده است. یک دسته را مطالعه کنید تا آمار نمایش داده شود.', en: 'No activity yet. Study a deck to see your stats here.' },
 };
 
 export function t(key: string, lang: Lang): string {
