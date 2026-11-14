@@ -1,19 +1,19 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Upload, Flame, Layers, ChevronLeft, Brain } from 'lucide-react';
+import { Search, Plus, Upload, Flame, Layers, ChevronLeft, Brain, Target, Flag } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useNav } from '@/context/NavContext';
 import { TopBar } from '@/components/TopBar';
 import { EmptyState } from '@/components/EmptyState';
 import { Modal } from '@/components/Modal';
-import { getAllDecks, createDeck } from '@/db/repos';
+import { getAllDecks, createDeck, getFlaggedCards } from '@/db/repos';
 import { countDueToday } from '@/db/sm2';
-import { getStreakDays } from '@/db/stats';
+import { getStreakDays, getReviewsToday } from '@/db/stats';
 import { getAllCardsWithDeck } from '@/db/sm2';
 import { searchNormalize, toPersianDigits } from '@/lib/normalize';
 import type { DeckWithCounts } from '@/db/types';
 
 export function HomeScreen() {
-  const { t, lang } = useApp();
+  const { t, lang, settings } = useApp();
   const { navigate } = useNav();
   const [query, setQuery] = useState('');
   const [decks, setDecks] = useState<DeckWithCounts[]>(() => getAllDecks());
@@ -22,6 +22,11 @@ export function HomeScreen() {
 
   const dueToday = useMemo(() => countDueToday(), []);
   const streak = useMemo(() => getStreakDays(), []);
+  const reviewsToday = useMemo(() => getReviewsToday(), []);
+  const flaggedCards = useMemo(() => getFlaggedCards(), []);
+  const dailyGoal = Number(settings.daily_goal || '20');
+  const goalProgress = Math.min(100, Math.round((reviewsToday / dailyGoal) * 100));
+  const goalReached = reviewsToday >= dailyGoal && dailyGoal > 0;
 
   const refresh = useCallback(() => setDecks(getAllDecks()), []);
 
@@ -60,7 +65,7 @@ export function HomeScreen() {
           />
         </div>
 
-        {/* Summary card */}
+        {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">
           <div className="card-surface flex items-center gap-3 p-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-400">
@@ -85,6 +90,50 @@ export function HomeScreen() {
             </div>
           </div>
         </div>
+
+        {/* Daily goal progress */}
+        <div className="card-surface p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target size={18} className="text-brand-600 dark:text-brand-400" />
+              <span className="text-sm font-medium text-ink-700 dark:text-ink-200">{t('dailyGoal')}</span>
+            </div>
+            <span className="text-sm tabular-nums text-ink-500 dark:text-ink-400">
+              {lang === 'fa' ? toPersianDigits(reviewsToday) : reviewsToday} / {lang === 'fa' ? toPersianDigits(dailyGoal) : dailyGoal}
+            </span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-700">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${goalReached ? 'bg-brand-500' : 'bg-brand-400'}`}
+              style={{ width: `${goalProgress}%` }}
+            />
+          </div>
+          {goalReached && (
+            <p className="mt-2 text-xs font-medium text-brand-600 dark:text-brand-400">{t('goalReached')}</p>
+          )}
+        </div>
+
+        {/* Flagged cards */}
+        {flaggedCards.length > 0 && !searchResults && (
+          <div>
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink-700 dark:text-ink-200">
+              <Flag size={16} className="text-accent-500" />
+              {t('flaggedCards')}
+            </h2>
+            <div className="space-y-2">
+              {flaggedCards.slice(0, 3).map((card) => (
+                <button
+                  key={card.id}
+                  onClick={() => navigate({ name: 'deck', deckId: getAllDecks().find((d) => d.name === card.deck_name)?.id ?? '' })}
+                  className="card-surface block w-full p-3 text-right transition active:scale-[0.99]"
+                >
+                  <p className="truncate text-sm font-medium text-ink-900 dark:text-white">{card.question}</p>
+                  <p className="mt-0.5 text-xs text-brand-600 dark:text-brand-400">{card.deck_name}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search results or deck list */}
         {searchResults ? (

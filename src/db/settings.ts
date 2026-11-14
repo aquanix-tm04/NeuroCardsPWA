@@ -6,6 +6,7 @@ const DEFAULTS: Record<string, string> = {
   font_size: 'md',
   study_direction: 'forward',
   daily_limit: '50',
+  daily_goal: '20',
   show_timer: '0',
   quiz_type: 'mcq',
   quiz_count: '10',

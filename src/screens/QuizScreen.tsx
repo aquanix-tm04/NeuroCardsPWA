@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { LatexContent } from '@/components/LatexContent';
 import { getAllDecks } from '@/db/repos';
 import { getAllCardsWithDeck } from '@/db/sm2';
-import { normalizeForMatch, stripLatex, toPersianDigits } from '@/lib/normalize';
+import { toPersianDigits } from '@/lib/normalize';
 import { checkAnswer as autoCheck, type CheckResult } from '@/lib/answerCheck';
 
 type QuizType = 'mcq' | 'typein' | 'tf';

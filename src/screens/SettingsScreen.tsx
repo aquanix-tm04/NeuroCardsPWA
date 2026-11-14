@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { Globe, Palette, Type, Brain, ListChecks, Database, Bell, Info, Download, Trash2 } from 'lucide-react';
+import { Globe, Palette, Type, Brain, ListChecks, Database, Bell, Info, Download, Trash2, User, Target } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { TopBar } from '@/components/TopBar';
 import { Modal } from '@/components/Modal';
 import { resetAllData, getAllDecks, getCardsInDeck } from '@/db/repos';
@@ -78,7 +79,9 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 export function SettingsScreen() {
   const { t, lang, theme, fontSize, settings, updateLang, updateTheme, updateFontSize, updateSetting } = useApp();
+  const { user, signOut, deleteAccount } = useAuth();
   const [showReset, setShowReset] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [reminderMsg, setReminderMsg] = useState('');
 
@@ -117,11 +120,45 @@ export function SettingsScreen() {
     updateSetting('reminder_enabled', enabled ? '1' : '0');
   };
 
+  const handleDeleteAccount = async () => {
+    const { error } = await deleteAccount();
+    if (error) {
+      alert(error);
+      return;
+    }
+    localStorage.removeItem('neurocards_transfer_done');
+    window.location.hash = '#/';
+    window.location.reload();
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    localStorage.removeItem('neurocards_transfer_done');
+    window.location.hash = '#/';
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-4 pb-28">
       <TopBar title={t('settings')} />
 
       <div className="space-y-4 px-4 pt-4">
+        {/* Account section */}
+        {user && (
+          <Section icon={<User size={18} />} title={t('account')}>
+            <Row label={t('email')}>
+              <span className="truncate text-sm text-ink-500 dark:text-ink-400" dir="ltr">{user.email}</span>
+            </Row>
+            <button onClick={handleSignOut} className="ghost-btn w-full text-sm">
+              {t('signOut')}
+            </button>
+            <button onClick={() => setShowDeleteAccount(true)} className="danger-btn w-full text-sm">
+              <Trash2 size={16} />
+              {t('deleteAccount')}
+            </button>
+          </Section>
+        )}
+
         <Section icon={<Globe size={18} />} title={t('language')}>
           <Segmented<Lang>
             value={lang}
@@ -188,6 +225,21 @@ export function SettingsScreen() {
               label={t('showTimer')}
               checked={settings.show_timer === '1'}
               onChange={(v) => updateSetting('show_timer', v ? '1' : '0')}
+            />
+          </Row>
+        </Section>
+
+        <Section icon={<Target size={18} />} title={t('dailyGoal')}>
+          <Row label={`${t('dailyGoal')}: ${num(settings.daily_goal ?? '20')}`}>
+            <input
+              type="range"
+              min={5}
+              max={100}
+              step={5}
+              value={Number(settings.daily_goal ?? '20')}
+              onChange={(e) => updateSetting('daily_goal', e.target.value)}
+              className="w-40 accent-brand-600"
+              aria-label={t('dailyGoal')}
             />
           </Row>
         </Section>
@@ -282,6 +334,20 @@ export function SettingsScreen() {
         }
       >
         <p className="text-sm text-ink-600 dark:text-ink-300">{t('resetConfirm')}</p>
+      </Modal>
+
+      <Modal
+        open={showDeleteAccount}
+        onClose={() => setShowDeleteAccount(false)}
+        title={t('deleteAccount')}
+        footer={
+          <>
+            <button onClick={() => setShowDeleteAccount(false)} className="ghost-btn flex-1">{t('cancel')}</button>
+            <button onClick={handleDeleteAccount} className="danger-btn flex-1">{t('delete')}</button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600 dark:text-ink-300">{t('deleteAccountConfirm')}</p>
       </Modal>
     </div>
   );

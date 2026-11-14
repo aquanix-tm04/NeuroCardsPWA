@@ -19,7 +19,7 @@ const STOPWORDS = new Set([
 function tokenize(text: string): string[] {
   const cleaned = stripLatex(text);
   return normalizeForMatch(cleaned)
-    .split(/[\s،,.؛:!?؛(){}[\]"'«»\-]+/)
+    .split(/[\s،,.؛:!?(){}[\]"'«»-]+/)
     .filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 

@@ -141,7 +141,7 @@ export function DeckDetailScreen({ deckId }: Props) {
             <span className="text-xs font-medium">{t('studyDeck')}</span>
           </button>
           <button
-            onClick={() => useNav().navigate({ name: 'quiz', deckId })}
+            onClick={() => navigate({ name: 'quiz', deckId })}
             className="flex flex-col items-center gap-1.5 rounded-2xl bg-ink-100 py-3.5 text-ink-700 transition hover:bg-ink-200 active:scale-[0.98] dark:bg-ink-700 dark:text-ink-100 dark:hover:bg-ink-600"
           >
             <ListChecks size={22} />
