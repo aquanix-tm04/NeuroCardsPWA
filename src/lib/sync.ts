@@ -55,7 +55,12 @@ interface CloudReview {
   next_due: string;
 }
 
-export function getReviewsToday(): number {
+function toEpoch(ts: string | number): number {
+  if (typeof ts === 'number') return ts;
+  return new Date(ts).getTime();
+}
+
+export async function pushLocalToCloud(): Promise<void> {
   if (!supabase) return;
   if (!isOnline()) { setStatus('offline'); return; }
 

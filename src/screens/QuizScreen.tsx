@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ListChecks, CheckCircle2, XCircle, Shuffle, ArrowLeft, ThumbsUp } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { useNav } from '@/context/NavContext';
 import { TopBar } from '@/components/TopBar';
 import { EmptyState } from '@/components/EmptyState';
 import { LatexContent } from '@/components/LatexContent';
@@ -38,7 +37,6 @@ function shuffle<T>(arr: T[]): T[] {
 
 export function QuizScreen({ deckId }: Props) {
   const { t, lang, settings } = useApp();
-  const { goBack } = useNav();
 
   const decks = useMemo(() => getAllDecks(), []);
   const [phase, setPhase] = useState<'setup' | 'quiz' | 'done'>('setup');

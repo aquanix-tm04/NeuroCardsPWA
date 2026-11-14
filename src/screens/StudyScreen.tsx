@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Undo2, RotateCw, X, CheckCircle2, Brain, Flag } from 'lucide-react';
+import { Undo2, RotateCw, CheckCircle2, Brain, Flag } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useNav } from '@/context/NavContext';
 import { TopBar } from '@/components/TopBar';

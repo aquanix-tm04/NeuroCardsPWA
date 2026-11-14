@@ -1,9 +1,6 @@
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
-const INLINE_RE = /\$([^$]+)\$/g;
-const DISPLAY_RE = /\$\$([^$]+)\$\$/g;
-
 function renderMath(expr: string, display: boolean): string {
   try {
     return katex.renderToString(expr, {
@@ -27,7 +24,6 @@ export function renderLatex(text: string): string {
   // Render display math first ($$...$$), then inline ($...$)
   // We need to handle both without double-processing.
   let result = '';
-  let i = 0;
   let remaining = escaped;
 
   while (remaining.length > 0) {
